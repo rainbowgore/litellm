@@ -1230,6 +1230,7 @@
         "max_output_tokens": 128000,
         "max_tokens": 128000,
         "mode": "chat",
+        "thinking_always_on": true,
         "supports_function_calling": true,
         "supports_vision": true,
         "supports_prompt_caching": false,
@@ -1402,6 +1403,7 @@
             "search_context_size_medium": 0.01
         },
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_mid_conversation_system": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
@@ -1438,6 +1440,7 @@
             "search_context_size_medium": 0.01
         },
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_mid_conversation_system": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
@@ -1474,6 +1477,7 @@
             "search_context_size_medium": 0.01
         },
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_mid_conversation_system": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
@@ -1510,6 +1514,7 @@
             "search_context_size_medium": 0.01
         },
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_mid_conversation_system": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
@@ -3013,6 +3018,7 @@
         "cache_creation_input_token_cost_above_1hr": 2e-05,
         "cache_read_input_token_cost": 1e-06,
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
         "supports_function_calling": true,
@@ -12770,6 +12776,7 @@
             "search_context_size_medium": 0.01
         },
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_mid_conversation_system": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
@@ -39413,6 +39420,7 @@
             "search_context_size_medium": 0.01
         },
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
         "supports_function_calling": true,
@@ -39446,6 +39454,7 @@
             "search_context_size_medium": 0.01
         },
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
         "supports_function_calling": true,
@@ -48765,6 +48774,7 @@
         },
         "source": "https://docs.claude.com/en/docs/about-claude/models/overview",
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_mid_conversation_system": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
@@ -48799,6 +48809,7 @@
         },
         "source": "https://docs.claude.com/en/docs/about-claude/models/overview",
         "supports_adaptive_thinking": true,
+        "thinking_always_on": true,
         "supports_assistant_prefill": false,
         "supports_computer_use": true,
         "supports_function_calling": true,
@@ -48973,6 +48984,14 @@
                 "description": "Claude at version 4.6 or higher, in any id shape that contains claude-<family>-: minors 4.6 through 4.99, any later major-minor, and bare 5+ majors so a new family shaped like claude-fable-5 matches. Requiring the claude- prefix keeps non-Claude names such as team-sonnet-5-1 out. The minor is capped at two digits so an 8-digit date suffix such as claude-opus-4-20250514 is never read as a >= 4.6 minor. Turns on adaptive thinking for new versions and new families with no code change.",
                 "model_info": {
                     "supports_adaptive_thinking": true
+                }
+            },
+            {
+                "name": "claude-always-on-thinking",
+                "pattern": "claude-(?:fable|mythos)-",
+                "description": "Any Claude Fable or Mythos id, under any provider namespace and any version. These families always think and reject thinking.type=disabled with a 400; the Anthropic transformations omit the param instead, so the model falls back to its default adaptive thinking.",
+                "model_info": {
+                    "thinking_always_on": true
                 }
             },
             {
