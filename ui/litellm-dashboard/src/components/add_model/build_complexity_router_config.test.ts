@@ -8,6 +8,10 @@ import {
   getTierLabelsError,
   hydrateTierLabels,
   BuildComplexityRouterConfigParams,
+  getCustomTierRowsError,
+  hydrateCustomTierSet,
+  hydratePlanModeMinTier,
+  serializeCustomTierSet,
 } from "./build_complexity_router_config";
 
 const tiers = {
@@ -654,5 +658,109 @@ describe("getPlanModeTierError", () => {
 
   it("blocks a tier whose models were removed, which the backend would reject with a 400", () => {
     expect(getPlanModeTierError("COMPLEX", tiersWithEmptyComplex)).toContain("COMPLEX");
+  });
+});
+
+describe("custom tier sets", () => {
+  const customTierSet = {
+    tiers: [
+      { id: "SIMPLE", name: "SIMPLE", definition: "", models: ["gpt-4o-mini"] },
+      { id: "COMPLEX", name: "COMPLEX", definition: "", models: ["claude-sonnet-4"] },
+      { id: "sec", name: "SECURITY_REVIEW", definition: "security audits", models: ["claude-sonnet-5"] },
+    ],
+    fallback_tier_id: "COMPLEX",
+  };
+  const customParams: BuildComplexityRouterConfigParams = {
+    ...baseParams,
+    customTierSet,
+    classifierLlmConfig: {
+      model: "haiku-classifier",
+      timeout_ms: 400,
+      classification_rubric: "agentic",
+      system_prompt: "grade it",
+    },
+    tierLabels: { SIMPLE: "Cheap" },
+    classifierFallback: "default_model",
+    sessionAffinity: true,
+    escalationKeywords: ["GO UP"],
+    adaptive: true,
+    planModeMinTier: "sec",
+    tierBoundaries: { simple_medium: 0.2, medium_complex: 0.4, complex_reasoning: 0.6 },
+  };
+
+  it("serializes rows in order and forces off everything the backend rejects beside tier_definitions", () => {
+    const config = buildComplexityRouterConfig(customParams);
+    expect(config).toEqual({
+      tiers: { SIMPLE: ["gpt-4o-mini"], COMPLEX: ["claude-sonnet-4"], SECURITY_REVIEW: ["claude-sonnet-5"] },
+      tier_definitions: [
+        { name: "SIMPLE" },
+        { name: "COMPLEX" },
+        { name: "SECURITY_REVIEW", description: "security audits" },
+      ],
+      fallback_tier: "COMPLEX",
+      classifier_type: "llm",
+      classifier_llm_config: { model: "haiku-classifier", timeout_ms: 400 },
+      session_affinity: false,
+      deployment_affinity: true,
+      escalation_keywords: [],
+      plan_mode_min_tier: "SECURITY_REVIEW",
+    });
+  });
+
+  it("omits the plan-mode floor when its row left the set, rather than a stale name", () => {
+    const config = buildComplexityRouterConfig({ ...customParams, planModeMinTier: "gone" });
+    expect(config).not.toHaveProperty("plan_mode_min_tier");
+  });
+
+  it("round-trips through hydrate with canonical ids for built-in names", () => {
+    const hydrated = hydrateCustomTierSet(serializeCustomTierSet(customTierSet));
+    expect(hydrated).toEqual({
+      tiers: [
+        { id: "SIMPLE", name: "SIMPLE", definition: "", models: ["gpt-4o-mini"] },
+        { id: "COMPLEX", name: "COMPLEX", definition: "", models: ["claude-sonnet-4"] },
+        { id: "stored-2", name: "SECURITY_REVIEW", definition: "security audits", models: ["claude-sonnet-5"] },
+      ],
+      fallback_tier_id: "COMPLEX",
+    });
+    expect(serializeCustomTierSet(hydrated!)).toEqual(serializeCustomTierSet(customTierSet));
+  });
+
+  it("hydrates a hand-written config this UI never produced, in stored severity order", () => {
+    const hydrated = hydrateCustomTierSet({
+      tier_definitions: [{ name: "audit", description: "a" }, { name: "simple" }],
+      tiers: { audit: "single-model-pin", simple: ["m1"] },
+      fallback_tier: "audit",
+    });
+    expect(hydrated?.tiers).toEqual([
+      { id: "stored-0", name: "audit", definition: "a", models: ["single-model-pin"] },
+      { id: "SIMPLE", name: "simple", definition: "", models: ["m1"] },
+    ]);
+    expect(hydrated?.fallback_tier_id).toBe("stored-0");
+  });
+
+  it("hydrates no set from a config without tier_definitions", () => {
+    expect(hydrateCustomTierSet({ tiers: { SIMPLE: ["m"] } })).toBeUndefined();
+  });
+
+  it("getCustomTierRowsError reports the first per-row gap and passes a complete set", () => {
+    expect(getCustomTierRowsError(customTierSet)).toBeNull();
+    expect(getCustomTierRowsError({ ...customTierSet, tiers: [{ id: "a", name: " ", definition: "d", models: ["m"] }] })).toBe("Name every tier");
+    expect(
+      getCustomTierRowsError({ ...customTierSet, tiers: [{ id: "a", name: "A", definition: " ", models: ["m"] }] }),
+    ).toContain("definition");
+    expect(
+      getCustomTierRowsError({
+        ...customTierSet,
+        tiers: [...customTierSet.tiers, { id: "new-1", name: "DRAFT", definition: "d", models: [] }],
+      }),
+    ).toContain("model");
+    expect(getCustomTierRowsError({ ...customTierSet, fallback_tier_id: "gone" })).toContain("Fallback");
+  });
+
+  it("hydratePlanModeMinTier maps the stored name to its row id and keeps an unmatched name raw", () => {
+    expect(hydratePlanModeMinTier("SECURITY_REVIEW", customTierSet)).toBe("sec");
+    expect(hydratePlanModeMinTier("NOT_A_TIER", customTierSet)).toBe("NOT_A_TIER");
+    expect(hydratePlanModeMinTier("COMPLEX", undefined)).toBe("COMPLEX");
+    expect(hydratePlanModeMinTier("  ", customTierSet)).toBeUndefined();
   });
 });

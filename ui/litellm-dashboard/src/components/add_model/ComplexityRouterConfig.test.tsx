@@ -874,3 +874,84 @@ describe("plan-mode override", () => {
     expect(await screen.findByRole("switch", { name: switchName })).toHaveAttribute("aria-disabled", "true");
   });
 });
+
+describe("edit tiers", () => {
+  const customValue: ComplexityRouterConfigValue = {
+    ...defaultValue,
+    classifier_type: "llm",
+    classifier_llm_config: { model: "gpt-3.5-turbo", timeout_ms: 3000 },
+    custom_tier_set: {
+      tiers: [
+        { id: "SIMPLE", name: "SIMPLE", definition: "", models: ["gpt-3.5-turbo"] },
+        { id: "COMPLEX", name: "COMPLEX", definition: "", models: ["gpt-4"] },
+        { id: "sec", name: "AUDIT", definition: "security audits", models: ["claude-3-opus"] },
+      ],
+      fallback_tier_id: "COMPLEX",
+    },
+  };
+
+  it("removing a built-in tier materializes the ordered row set and touches nothing else", async () => {
+    const onChange = vi.fn();
+    renderWithProviders(<ComplexityRouterConfig {...baseProps} onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: "Edit tiers" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove the MEDIUM tier" }));
+    expect(onChange).toHaveBeenCalledWith({
+      ...defaultValue,
+      custom_tier_set: {
+        tiers: [
+          { id: "SIMPLE", name: "SIMPLE", definition: "", models: defaultValue.tiers.SIMPLE },
+          { id: "COMPLEX", name: "COMPLEX", definition: "", models: defaultValue.tiers.COMPLEX },
+          { id: "REASONING", name: "REASONING", definition: "", models: defaultValue.tiers.REASONING },
+        ],
+        fallback_tier_id: "SIMPLE",
+      },
+    });
+  });
+
+  it("restoring the removed built-in returns the exact pre-edit value, so undo leaves nothing behind", async () => {
+    const onChange = vi.fn();
+    const removed: ComplexityRouterConfigValue = {
+      ...defaultValue,
+      custom_tier_set: {
+        tiers: (["SIMPLE", "COMPLEX", "REASONING"] as const).map((tier) => ({
+          id: tier,
+          name: tier,
+          definition: "",
+          models: defaultValue.tiers[tier],
+        })),
+        fallback_tier_id: "SIMPLE",
+      },
+    };
+    renderWithProviders(<ComplexityRouterConfig {...baseProps} value={removed} onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: "Restore MEDIUM" }));
+    expect(onChange).toHaveBeenCalledWith(defaultValue);
+  });
+
+  it("removing a row snapshots its in-editor models so Restore returns them, not a stale pool", async () => {
+    const onChange = vi.fn();
+    const edited: ComplexityRouterConfigValue = {
+      ...customValue,
+      custom_tier_set: {
+        ...customValue.custom_tier_set!,
+        tiers: customValue.custom_tier_set!.tiers.map((row) =>
+          row.id === "SIMPLE" ? { ...row, models: ["edited-in-editor"] } : row,
+        ),
+      },
+    };
+    renderWithProviders(<ComplexityRouterConfig {...baseProps} value={edited} onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: "Remove the SIMPLE tier" }));
+    const next = onChange.mock.calls[0][0] as ComplexityRouterConfigValue;
+    expect(next.tiers.SIMPLE).toEqual(["edited-in-editor"]);
+    expect(next.custom_tier_set?.tiers.some((row) => row.id === "SIMPLE")).toBe(false);
+  });
+
+  it("shows name and definition inputs for the rows and disables session pinning with a hint", async () => {
+    renderWithProviders(<ComplexityRouterConfig {...baseProps} value={customValue} />);
+    expect(screen.getByLabelText("Name for tier 3")).toHaveValue("AUDIT");
+    expect(screen.getByLabelText("Definition for tier 3")).toHaveValue("security audits");
+    expect(screen.queryByLabelText("Display name for the Simple tier")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText("Advanced: Affinity"));
+    expect(screen.getByLabelText("Pin a session to its first model")).toHaveAttribute("data-disabled");
+    expect(screen.getByText(/Unavailable with an edited tier set: escalating a pinned session/)).toBeInTheDocument();
+  });
+});
