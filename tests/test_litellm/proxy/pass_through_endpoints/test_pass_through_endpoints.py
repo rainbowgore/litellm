@@ -5571,3 +5571,54 @@ async def test_pass_through_route_pings_while_the_upstream_call_is_still_running
 
     assert (collected[0] == b": ping\n\n") is expect_ping
     assert collected[-1] in (MESSAGE_START_SSE_FRAME, MESSAGE_START_SSE_FRAME.decode())
+
+
+def test_passthrough_carries_the_per_model_budgets():
+    """
+    Native passthrough builds its logging metadata from
+    StandardLoggingUserAPIKeyMetadata, which has no budget field, and never calls
+    add_litellm_data_to_request. Without these three keys the post-call increment
+    exits early, so a /bedrock/... request is costed but its per-model counter is
+    never written: the budget reports zero forever and enforces nothing.
+    """
+    key_budget = {"claude-opus-4-8": {"budget_limit": 1.0, "time_period": "18h"}}
+    user_budget = {"claude-opus-4-8": {"budget_limit": 2.0, "time_period": "1mo"}}
+    end_user_budget = {"claude-opus-4-8": {"budget_limit": 3.0, "time_period": "1d"}}
+
+    kwargs = _passthrough_kwargs_for_reservation(
+        UserAPIKeyAuth(
+            token="hash",
+            user_id="u-1",
+            model_max_budget=key_budget,
+            user_model_max_budget=user_budget,
+            end_user_model_max_budget=end_user_budget,
+        )
+    )
+
+    metadata = kwargs["litellm_params"]["metadata"]
+    assert metadata["user_api_key_model_max_budget"] == key_budget
+    assert metadata["user_api_key_user_model_max_budget"] == user_budget
+    assert metadata["user_api_key_end_user_model_max_budget"] == end_user_budget
+
+
+def test_passthrough_budget_metadata_cannot_be_forged_by_the_request_body():
+    """
+    These keys decide budget enforcement, so a caller-supplied body must not be
+    able to raise its own cap. They are set after the client metadata merge for
+    the same reason user_api_key and the parent span are.
+    """
+    key_budget = {"claude-opus-4-8": {"budget_limit": 1.0, "time_period": "18h"}}
+
+    kwargs = _passthrough_kwargs_for_reservation(
+        UserAPIKeyAuth(token="hash", user_id="u-1", model_max_budget=key_budget),
+        parsed_body={
+            "litellm_metadata": {
+                "user_api_key_model_max_budget": {
+                    "claude-opus-4-8": {"budget_limit": 999999.0, "time_period": "18h"}
+                }
+            }
+        },
+    )
+
+    metadata = kwargs["litellm_params"]["metadata"]
+    assert metadata["user_api_key_model_max_budget"] == key_budget
