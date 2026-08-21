@@ -392,24 +392,28 @@ export const buildComplexityRouterConfig = ({
   };
   const scorerKnobs = scorerKnobPayload(scorerInputs);
 
+  // A custom tier set forces the LLM classifier on the wire, so llm-only inputs (context knobs,
+  // the classifier config) must survive serialization even while the raw form field still says
+  // heuristic; reading the raw field here is what silently dropped them.
+  const effectiveType: ClassifierType = customTierSet ? "llm" : classifierType;
   const payload: ComplexityRouterConfigPayload = {
     tiers,
     ...(defaultModel?.trim() && { default_model: defaultModel }),
     ...(planModeMinTier?.trim() && { plan_mode_min_tier: planModeMinTier }),
     ...(cleanedTierLabels && { tier_labels: cleanedTierLabels }),
     classifier_type: classifierType,
-    ...(classifierType === "llm" &&
+    ...(effectiveType === "llm" &&
       classifierLlmConfig && { classifier_llm_config: normalizeClassifierLlmConfig(classifierLlmConfig) }),
     ...(classifierType === "llm" && classifierFallback !== undefined && { classifier_fallback: classifierFallback }),
-    ...(classifierType === "llm" &&
+    ...(effectiveType === "llm" &&
       classifierContextWindowSize !== undefined && {
         classifier_context_window_size: classifierContextWindowSize,
       }),
-    ...(classifierType === "llm" &&
+    ...(effectiveType === "llm" &&
       classifierContextPerTurnChars !== undefined && {
         classifier_context_per_turn_chars: classifierContextPerTurnChars,
       }),
-    ...(classifierType === "llm" &&
+    ...(effectiveType === "llm" &&
       classifierContextIncludeAssistantTurns !== undefined && {
         classifier_context_include_assistant_turns: classifierContextIncludeAssistantTurns,
       }),

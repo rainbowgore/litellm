@@ -744,7 +744,9 @@ describe("custom tier sets", () => {
 
   it("getCustomTierRowsError reports the first per-row gap and passes a complete set", () => {
     expect(getCustomTierRowsError(customTierSet)).toBeNull();
-    expect(getCustomTierRowsError({ ...customTierSet, tiers: [{ id: "a", name: " ", definition: "d", models: ["m"] }] })).toBe("Name every tier");
+    expect(
+      getCustomTierRowsError({ ...customTierSet, tiers: [{ id: "a", name: " ", definition: "d", models: ["m"] }] }),
+    ).toBe("Name every tier");
     expect(
       getCustomTierRowsError({ ...customTierSet, tiers: [{ id: "a", name: "A", definition: " ", models: ["m"] }] }),
     ).toContain("definition");
@@ -762,5 +764,30 @@ describe("custom tier sets", () => {
     expect(hydratePlanModeMinTier("NOT_A_TIER", customTierSet)).toBe("NOT_A_TIER");
     expect(hydratePlanModeMinTier("COMPLEX", undefined)).toBe("COMPLEX");
     expect(hydratePlanModeMinTier("  ", customTierSet)).toBeUndefined();
+  });
+});
+
+describe("custom tier set keeps llm-only inputs the raw form field would drop", () => {
+  it("emits classifier context knobs while the raw classifier_type still says heuristic", () => {
+    const config = buildComplexityRouterConfig({
+      ...baseParams,
+      customTierSet: {
+        tiers: [
+          { id: "SIMPLE", name: "SIMPLE", definition: "", models: ["m1"] },
+          { id: "sec", name: "AUDIT", definition: "audits", models: ["m2"] },
+        ],
+        fallback_tier_id: "sec",
+      },
+      classifierType: "heuristic",
+      classifierLlmConfig: { model: "clf", timeout_ms: 400 },
+      classifierContextWindowSize: 5,
+      classifierContextPerTurnChars: 300,
+      classifierContextIncludeAssistantTurns: true,
+    });
+    expect(config.classifier_type).toBe("llm");
+    expect(config.classifier_llm_config).toEqual({ model: "clf", timeout_ms: 400 });
+    expect(config.classifier_context_window_size).toBe(5);
+    expect(config.classifier_context_per_turn_chars).toBe(300);
+    expect(config.classifier_context_include_assistant_turns).toBe(true);
   });
 });

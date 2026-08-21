@@ -945,6 +945,16 @@ describe("edit tiers", () => {
     expect(next.custom_tier_set?.tiers.some((row) => row.id === "SIMPLE")).toBe(false);
   });
 
+  it("warns that a configured classifier prompt is unused with an edited tier set", async () => {
+    const withPrompt: ComplexityRouterConfigValue = {
+      ...customValue,
+      classifier_llm_config: { model: "gpt-3.5-turbo", timeout_ms: 3000, system_prompt: "grade it my way" },
+    };
+    renderWithProviders(<ComplexityRouterConfig {...baseProps} value={withPrompt} />);
+    await userEvent.click(screen.getByText("Advanced: Classification Method"));
+    expect(screen.getByText(/prompt and rubric preset are not used with an edited tier set/)).toBeInTheDocument();
+  });
+
   it("shows name and definition inputs for the rows and disables session pinning with a hint", async () => {
     renderWithProviders(<ComplexityRouterConfig {...baseProps} value={customValue} />);
     expect(screen.getByLabelText("Name for tier 3")).toHaveValue("AUDIT");

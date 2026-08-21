@@ -52,6 +52,7 @@ import ComplexityRouterConfig, {
   DEFAULT_TIER_DISTANCE_PENALTY,
   heuristicScoringRole,
   CustomTierSet,
+  effectiveClassifierType,
 } from "../add_model/ComplexityRouterConfig";
 import {
   Dialog,
@@ -495,13 +496,17 @@ const EditAutoRouterModal: React.FC<EditAutoRouterModalProps> = ({
 
   const saveValues = async (values: EditAutoRouterFormValues) => {
     if (isComplexityRouterModel) {
-      const { tiers, classifier_type, classifier_llm_config } = complexityRouterConfig;
-      if (Object.values(tiers).every((models) => models.length === 0)) {
+      const { tiers, custom_tier_set, classifier_llm_config } = complexityRouterConfig;
+      const builtInError = Object.values(tiers).every((models) => models.length === 0)
+        ? "Please select at least one model for a complexity tier"
+        : null;
+      const rowsError = custom_tier_set ? getCustomTierRowsError(custom_tier_set) : builtInError;
+      if (rowsError) {
         setShowValidationErrors(true);
-        toast.fromError("Please select at least one model for a complexity tier");
+        toast.fromError(rowsError);
         return;
       }
-      if (classifier_type === "llm" && !classifier_llm_config?.model) {
+      if (effectiveClassifierType(complexityRouterConfig) === "llm" && !classifier_llm_config?.model) {
         setShowValidationErrors(true);
         toast.fromError("Please select a classifier model, or switch back to Heuristic");
         return;

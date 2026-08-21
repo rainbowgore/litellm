@@ -289,6 +289,15 @@ const ClassificationMethodConfig: React.FC<ClassificationMethodConfigProps> = ({
 
       {classifierType === "llm" && (
         <div className="mt-4 space-y-3">
+          {hasCustomTierSet &&
+            Boolean(
+              value.classifier_llm_config?.system_prompt?.trim() || value.classifier_llm_config?.classification_rubric,
+            ) && (
+              <span className="block text-xs text-muted-foreground">
+                Your custom classifier prompt and rubric preset are not used with an edited tier set: the classifier
+                prompt is built from your tier definitions. Restore the built-in tiers to use them again.
+              </span>
+            )}
           <div>
             <strong className="block mb-1 font-semibold">Classifier Model</strong>
             <SearchSelect
