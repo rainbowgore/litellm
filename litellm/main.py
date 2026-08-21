@@ -517,6 +517,7 @@ async def acompletion(
             tools=tools,
         )
     ):
+        breakpoints_before_hooks: Final = AnthropicCacheControlHook.count_request_cache_breakpoints(messages)
         (
             model,
             messages,
@@ -530,6 +531,10 @@ async def acompletion(
             tools=tools,
             prompt_label=kwargs.get("prompt_label", None),
             prompt_version=kwargs.get("prompt_version", None),
+        )
+        AnthropicCacheControlHook.record_gateway_added_breakpoints(
+            kwargs,
+            AnthropicCacheControlHook.count_request_cache_breakpoints(messages) - breakpoints_before_hooks,
         )
         #########################################################
         # if the chat completion logging hook removed all tools,
@@ -5180,6 +5185,7 @@ def completion(
             prompt_id=prompt_id, non_default_params=non_default_params
         )
     ):
+        breakpoints_before_hooks: Final = AnthropicCacheControlHook.count_request_cache_breakpoints(messages)
         (
             model,
             messages,
@@ -5192,6 +5198,10 @@ def completion(
             prompt_variables=prompt_variables,
             prompt_label=kwargs.get("prompt_label", None),
             prompt_version=kwargs.get("prompt_version", None),
+        )
+        AnthropicCacheControlHook.record_gateway_added_breakpoints(
+            kwargs,
+            AnthropicCacheControlHook.count_request_cache_breakpoints(messages) - breakpoints_before_hooks,
         )
 
     ### LITELLM SYSTEM PROMPT ###
