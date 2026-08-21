@@ -44,7 +44,7 @@ class AnthropicResponsesStreamWrapper:
         self._sent_message_stop = False
         self._chunk_queue: deque = deque()
 
-    def _make_message_start(self) -> dict[str, Any]:
+    def _make_message_start(self, model: str | None = None) -> dict[str, Any]:
         return {
             "type": "message_start",
             "message": {
@@ -52,7 +52,7 @@ class AnthropicResponsesStreamWrapper:
                 "type": "message",
                 "role": "assistant",
                 "content": [],
-                "model": self.model,
+                "model": model or self.model,
                 "stop_reason": None,
                 "stop_sequence": None,
                 "usage": {
@@ -94,7 +94,10 @@ class AnthropicResponsesStreamWrapper:
         if event_type == "response.created":
             if not self._sent_message_start:
                 self._sent_message_start = True
-                self._chunk_queue.append(self._make_message_start())
+                event_model: Final = getattr(event, "model", None) or (
+                    event.get("model") if isinstance(event, dict) else None
+                )
+                self._chunk_queue.append(self._make_message_start(event_model))
             return
 
         # ---- content_block_start for a new output message item ----

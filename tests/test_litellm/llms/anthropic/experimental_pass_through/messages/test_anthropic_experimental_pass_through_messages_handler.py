@@ -217,7 +217,10 @@ async def _async_return(value):
 
 def test_anthropic_experimental_pass_through_messages_handler_custom_llm_provider():
     """
-    Test that litellm.completion is called when a custom LLM provider is given
+    Test that litellm.completion is called when a custom LLM provider is given.
+
+    Provider resolution now happens exactly once, inside litellm.completion itself
+    (BerriAI/litellm#37716), so the handler passes the original unresolved model through.
     """
     from litellm.llms.anthropic.experimental_pass_through.messages.handler import (
         anthropic_messages_handler,
@@ -241,7 +244,7 @@ def test_anthropic_experimental_pass_through_messages_handler_custom_llm_provide
         # Verify that the custom provider was passed through
         call_kwargs = mock_completion.call_args.kwargs
         assert call_kwargs["custom_llm_provider"] == "my-custom-llm"
-        assert call_kwargs["model"] == "my-custom-llm/my-custom-model"
+        assert call_kwargs["model"] == "my-custom-model"
         assert call_kwargs["api_key"] == "test-api-key"
 
 
