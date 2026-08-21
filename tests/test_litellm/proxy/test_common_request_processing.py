@@ -5593,6 +5593,32 @@ class TestStreamingClientDisconnectBilling:
         assert standard_logging_object["response_cost"] > 0.0
 
     @pytest.mark.asyncio
+    async def test_disconnect_billing_router_recovery_survives_pre_call_model_rewrite(self):
+        """
+        Pre-call routing can rewrite ``request_data["model"]`` to the deployment id while
+        preserving the client alias in ``_litellm_client_requested_model``. The
+        client-asked-for gate must key off the preserved name so that an Azure Model
+        Router style later-chunk recovery is not misread as an alias restamp and
+        stomped by the wrapper's model.
+        """
+        def restamp_like_azure_model_router(response):
+            response.chunks[0].model = "azure-model-router"
+            for chunk in response.chunks[1:]:
+                chunk.model = "gpt-4.1-nano-2025-04-14"
+
+        event = await self._bill_and_collect_success_event(
+            restamp_like_azure_model_router,
+            request_data={
+                "model": "gpt-4.1-nano-2025-04-14",
+                "_litellm_client_requested_model": "azure-model-router",
+            },
+        )
+
+        assert event["response_obj"].model == "gpt-4.1-nano-2025-04-14"
+        standard_logging_object = event["kwargs"]["standard_logging_object"]
+        assert standard_logging_object["response_cost"] > 0.0
+
+    @pytest.mark.asyncio
     async def test_disconnect_billing_backfills_missing_cache_fields(self):
         event = await self._bill_and_collect_success_event()
 

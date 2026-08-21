@@ -304,11 +304,16 @@ def _assembled_model_is_the_name_the_client_asked_for(request_data: dict, assemb
 
     That stamp is what leaves an unpriced alias on the partial response, so the deployment's
     own model has to go back on before the row is costed.
+
+    Prefer the preserved client-requested name over ``request_data["model"]`` because pre-call
+    alias and routing rewrites can replace the latter with the deployment target; matching that
+    rewritten id would misclassify an Azure Model Router style later-chunk recovery as an alias
+    restamp and stamp the wrapper's model over it.
     """
-    return assembled_model in (
-        request_data.get("_litellm_client_requested_model"),
-        request_data.get("model"),
-    )
+    client_requested: Final = request_data.get("_litellm_client_requested_model")
+    if isinstance(client_requested, str):
+        return assembled_model == client_requested
+    return assembled_model == request_data.get("model")
 
 
 async def _bill_partial_streamed_spend_on_disconnect(request_data: dict, response: object) -> bool:
